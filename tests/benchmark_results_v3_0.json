@@ -1,0 +1,56 @@
+{
+  "version": "3.0.0",
+  "timestamp": "2025-11-02T19:17:36.328379",
+  "num_trials": 20,
+  "tests": {
+    "debug_config": {
+      "forward_pass": {
+        "successful": 20,
+        "failed": 0,
+        "success_rate": 100.0,
+        "errors": []
+      },
+      "learning_step": {
+        "successful": 20,
+        "failed": 0,
+        "success_rate": 100.0,
+        "loss_decreased_count": 20,
+        "errors": []
+      },
+      "gradient_flow": {
+        "success": true,
+        "params_with_grad": 69,
+        "total_params": 71,
+        "gradient_coverage": 97.1830985915493,
+        "avg_grad_norm": 0.029618819681249756
+      }
+    },
+    "small_config": {
+      "forward_pass": {
+        "successful": 20,
+        "failed": 0,
+        "success_rate": 100.0,
+        "errors": []
+      },
+      "learning_step": {
+        "successful": 20,
+        "failed": 0,
+        "success_rate": 100.0,
+        "loss_decreased_count": 20,
+        "errors": []
+      },
+      "gradient_flow": {
+        "success": true,
+        "params_with_grad": 98,
+        "total_params": 102,
+        "gradient_coverage": 96.07843137254902,
+        "avg_grad_norm": 0.025236346703240688
+      }
+    }
+  },
+  "overall": {
+    "forward_pass_success": 100.0,
+    "learning_step_success": 100.0,
+    "production_ready": true
+  }
+}
