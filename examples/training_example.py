@@ -1,160 +1,149 @@
 """
-Training Example for DHC-SSM v3.0
+Training example using real CIFAR-10 dataset.
 
-This example demonstrates how to train the DHC-SSM model.
+This replaces the previous dummy data approach with actual validation.
 """
 
 import torch
-from torch.utils.data import DataLoader, TensorDataset
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader
+import torchvision
+import torchvision.transforms as transforms
 import sys
-from pathlib import Path
+import os
 
 # Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dhc_ssm import DHCSSMModel, Trainer, get_debug_config
-from dhc_ssm.core.learning_engine import DeterministicOptimizer
+from dhc_ssm.core.model import DHCSSMModel, DHCSSMConfig
 
 
-def create_dummy_dataset(num_samples=200, num_classes=10):
-    """Create a dummy dataset for demonstration."""
-    # Random images
-    images = torch.randn(num_samples, 3, 32, 32)
-    # Random labels
-    labels = torch.randint(0, num_classes, (num_samples,))
-    return TensorDataset(images, labels)
+def get_cifar10_loaders(batch_size=32):
+    """Load CIFAR-10 dataset."""
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+    
+    trainset = torchvision.datasets.CIFAR10(
+        root='./data', 
+        train=True,
+        download=True, 
+        transform=transform
+    )
+    trainloader = DataLoader(
+        trainset, 
+        batch_size=batch_size,
+        shuffle=True, 
+        num_workers=2
+    )
+    
+    testset = torchvision.datasets.CIFAR10(
+        root='./data', 
+        train=False,
+        download=True, 
+        transform=transform
+    )
+    testloader = DataLoader(
+        testset, 
+        batch_size=batch_size,
+        shuffle=False, 
+        num_workers=2
+    )
+    
+    return trainloader, testloader
+
+
+def train_epoch(model, loader, optimizer, device):
+    """Train for one epoch."""
+    model.train()
+    total_loss = 0
+    total_acc = 0
+    num_batches = 0
+    
+    for batch_idx, (data, target) in enumerate(loader):
+        data, target = data.to(device), target.to(device)
+        
+        metrics = model.train_step((data, target), optimizer)
+        
+        total_loss += metrics['loss']
+        total_acc += metrics['accuracy']
+        num_batches += 1
+        
+        if batch_idx % 100 == 0:
+            print(f"Batch {batch_idx}/{len(loader)}, "
+                  f"Loss: {metrics['loss']:.4f}, "
+                  f"Acc: {metrics['accuracy']:.4f}")
+    
+    return {
+        'loss': total_loss / num_batches,
+        'accuracy': total_acc / num_batches
+    }
+
+
+def evaluate(model, loader, device):
+    """Evaluate model."""
+    model.eval()
+    total_loss = 0
+    total_acc = 0
+    num_batches = 0
+    
+    with torch.no_grad():
+        for data, target in loader:
+            data, target = data.to(device), target.to(device)
+            
+            metrics = model.evaluate_step((data, target))
+            
+            total_loss += metrics['loss']
+            total_acc += metrics['accuracy']
+            num_batches += 1
+    
+    return {
+        'loss': total_loss / num_batches,
+        'accuracy': total_acc / num_batches
+    }
 
 
 def main():
-    print("=" * 70)
-    print("DHC-SSM v3.0 - Training Example")
-    print("=" * 70)
-    
+    """Main training loop."""
     # Configuration
-    print("\n1. Setting up configuration...")
-    config = get_debug_config()  # Use debug config for fast training
-    config.update(
-        num_epochs=5,
-        batch_size=8,
-        learning_rate=1e-3,
-        log_interval=5,
-    )
-    print(f"   ✓ Configuration: {config.spatial_dim}D spatial, {config.temporal_dim}D temporal")
-    
-    # Create model
-    print("\n2. Creating model...")
-    model = DHCSSMModel(config)
-    print(f"   ✓ Model created with {model.num_parameters:,} parameters")
-    
-    # Create datasets
-    print("\n3. Creating datasets...")
-    train_dataset = create_dummy_dataset(num_samples=160, num_classes=config.output_dim)
-    val_dataset = create_dummy_dataset(num_samples=40, num_classes=config.output_dim)
-    
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-        num_workers=0,  # Use 0 for debugging
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-        num_workers=0,
+    config = DHCSSMConfig(
+        input_channels=3,
+        hidden_dim=64,
+        state_dim=64,
+        output_dim=10
     )
     
-    print(f"   ✓ Train samples: {len(train_dataset)}")
-    print(f"   ✓ Val samples: {len(val_dataset)}")
-    print(f"   ✓ Batch size: {config.batch_size}")
+    # Setup
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Using device: {device}")
     
-    # Create optimizer
-    print("\n4. Creating optimizer...")
-    optimizer = DeterministicOptimizer(
-        model.parameters(),
-        lr=config.learning_rate,
-        weight_decay=config.weight_decay,
-        gradient_clip=config.gradient_clip,
-    )
-    print(f"   ✓ Optimizer: AdamW (lr={config.learning_rate})")
+    # Model
+    model = DHCSSMModel(config).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
     
-    # Create trainer
-    print("\n5. Creating trainer...")
-    trainer = Trainer(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        optimizer=optimizer,
-        checkpoint_dir="./checkpoints",
-        log_dir="./logs",
-    )
-    print(f"   ✓ Trainer initialized")
+    # Data
+    print("Loading CIFAR-10 dataset...")
+    train_loader, test_loader = get_cifar10_loaders(batch_size=32)
     
-    # Test single training step
-    print("\n6. Testing single training step...")
-    sample_batch = next(iter(train_loader))
-    sample_x, sample_y = sample_batch
+    # Training
+    num_epochs = 10
+    print(f"\nTraining for {num_epochs} epochs...")
     
-    metrics = model.train_step(sample_x, sample_y, optimizer)
-    print(f"   ✓ Training step successful")
-    print(f"   - Loss: {metrics.get('total', 0):.4f}")
-    print(f"   - Metrics: {list(metrics.keys())}")
+    for epoch in range(num_epochs):
+        print(f"\nEpoch {epoch+1}/{num_epochs}")
+        
+        train_metrics = train_epoch(model, train_loader, optimizer, device)
+        test_metrics = evaluate(model, test_loader, device)
+        
+        print(f"Train Loss: {train_metrics['loss']:.4f}, "
+              f"Train Acc: {train_metrics['accuracy']:.4f}")
+        print(f"Test Loss: {test_metrics['loss']:.4f}, "
+              f"Test Acc: {test_metrics['accuracy']:.4f}")
     
-    # Test single evaluation step
-    print("\n7. Testing single evaluation step...")
-    val_batch = next(iter(val_loader))
-    val_x, val_y = val_batch
-    
-    val_metrics = model.evaluate_step(val_x, val_y)
-    print(f"   ✓ Evaluation step successful")
-    print(f"   - Loss: {val_metrics.get('total', 0):.4f}")
-    print(f"   - Accuracy: {val_metrics.get('accuracy', 0):.4f}")
-    
-    # Run training
-    print("\n8. Starting training...")
-    print(f"   Training for {config.num_epochs} epochs...")
-    print("-" * 70)
-    
-    history = trainer.train(
-        num_epochs=config.num_epochs,
-        early_stopping_patience=10,
-    )
-    
-    print("-" * 70)
-    print("\n9. Training completed!")
-    
-    # Print training summary
-    if history['train']:
-        final_train = history['train'][-1]
-        print(f"\n   Final Training Metrics:")
-        for key, stats in final_train.items():
-            if isinstance(stats, dict) and 'mean' in stats:
-                print(f"     - {key}: {stats['mean']:.4f} ± {stats['std']:.4f}")
-    
-    if history['val']:
-        final_val = history['val'][-1]
-        print(f"\n   Final Validation Metrics:")
-        for key, stats in final_val.items():
-            if isinstance(stats, dict) and 'mean' in stats:
-                print(f"     - {key}: {stats['mean']:.4f} ± {stats['std']:.4f}")
-    
-    # Test final model
-    print("\n10. Testing final model...")
-    model.eval()
-    with torch.no_grad():
-        test_x, test_y = next(iter(val_loader))
-        test_pred = model(test_x)
-        test_acc = (test_pred.argmax(dim=-1) == test_y).float().mean()
-    
-    print(f"   ✓ Test accuracy: {test_acc:.4f}")
-    
-    print("\n" + "=" * 70)
-    print("✓ Training example completed successfully!")
-    print("=" * 70)
-    print(f"\nCheckpoints saved to: ./checkpoints")
-    print(f"Logs saved to: ./logs")
-    print(f"\nTo view training logs, run:")
-    print(f"  tensorboard --logdir=./logs")
+    print("\nTraining complete!")
+    print(f"Final Test Accuracy: {test_metrics['accuracy']:.4f}")
 
 
 if __name__ == "__main__":
