@@ -22,16 +22,16 @@ Version: 3.0.0
 
 from dhc_ssm.version import __version__, __author__, __license__, __description__
 
-# Core components
-from dhc_ssm.core.model import DHCSSMModel
-from dhc_ssm.core.spatial_encoder import SpatialEncoder
-from dhc_ssm.core.temporal_processor import TemporalProcessor
-from dhc_ssm.core.strategic_reasoner import StrategicReasoner
-from dhc_ssm.core.learning_engine import LearningEngine
+# Core components - import from model.py where they are actually defined
+from dhc_ssm.core.model import (
+    DHCSSMModel,
+    DHCSSMConfig,
+    SpatialEncoder,
+    TemporalSSM,
+)
 
 # Utilities
 from dhc_ssm.utils.config import (
-    DHCSSMConfig,
     get_default_config,
     get_small_config,
     get_large_config,
@@ -50,15 +50,13 @@ __all__ = [
     
     # Core model
     "DHCSSMModel",
+    "DHCSSMConfig",
     
     # Architecture components
     "SpatialEncoder",
-    "TemporalProcessor",
-    "StrategicReasoner",
-    "LearningEngine",
+    "TemporalSSM",
     
     # Configuration
-    "DHCSSMConfig",
     "get_default_config",
     "get_small_config",
     "get_large_config",
@@ -67,11 +65,3 @@ __all__ = [
     # Training
     "Trainer",
 ]
-
-# Package metadata
-__all__.extend([
-    "__version__",
-    "__author__",
-    "__license__",
-    "__description__"
-])

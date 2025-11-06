@@ -73,21 +73,27 @@ class DHCSSMModel(nn.Module):
         super().__init__()
         self.config = config
         
+        # Use config attributes or set defaults
+        hidden_dim = getattr(config, 'hidden_dim', 64)
+        state_dim = getattr(config, 'ssm_state_dim', 64)
+        input_channels = getattr(config, 'input_channels', 3)
+        output_dim = getattr(config, 'output_dim', 10)
+        
         self.spatial_encoder = SpatialEncoder(
-            input_channels=config.input_channels,
-            hidden_dim=config.hidden_dim
+            input_channels=input_channels,
+            hidden_dim=hidden_dim
         )
         
         self.temporal_ssm = TemporalSSM(
-            hidden_dim=config.hidden_dim * 4,
-            state_dim=config.state_dim
+            hidden_dim=hidden_dim * 4,
+            state_dim=state_dim
         )
         
         self.classifier = nn.Sequential(
-            nn.Linear(config.hidden_dim * 4, config.hidden_dim * 2),
+            nn.Linear(hidden_dim * 4, hidden_dim * 2),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(config.hidden_dim * 2, config.output_dim)
+            nn.Linear(hidden_dim * 2, output_dim)
         )
         
         self._initialize_weights()
@@ -102,10 +108,19 @@ class DHCSSMModel(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
     
-    def forward(self, x):
+    def forward(self, x, return_features=False):
         spatial_features = self.spatial_encoder(x)
         temporal_features = self.temporal_ssm(spatial_features)
         logits = self.classifier(temporal_features)
+        
+        if return_features:
+            features = {
+                'spatial': spatial_features,
+                'temporal': temporal_features,
+                'logits': logits
+            }
+            return logits, features
+        
         return logits
     
     def compute_loss(self, logits, targets):
@@ -145,6 +160,42 @@ class DHCSSMModel(nn.Module):
         return {
             'loss': loss.item(),
             'accuracy': accuracy.item()
+        }
+    
+    @property
+    def num_parameters(self):
+        """Get total number of parameters."""
+        return sum(p.numel() for p in self.parameters())
+    
+    @property
+    def device(self):
+        """Get model device."""
+        return next(self.parameters()).device
+    
+    def get_diagnostics(self):
+        """Get model diagnostics."""
+        return {
+            'architecture': 'DHC-SSM v3.1',
+            'complexity': 'O(n)',
+            'num_parameters': self.num_parameters,
+            'device': str(self.device),
+            'layers': {
+                'spatial_encoder': {
+                    'type': 'CNN',
+                    'output_dim': self.config.hidden_dim * 4 if hasattr(self.config, 'hidden_dim') else 256,
+                    'complexity': 'O(n)'
+                },
+                'temporal_ssm': {
+                    'type': 'State Space Model',
+                    'output_dim': self.config.hidden_dim * 4 if hasattr(self.config, 'hidden_dim') else 256,
+                    'complexity': 'O(n)'
+                },
+                'classifier': {
+                    'type': 'MLP',
+                    'output_dim': self.config.output_dim if hasattr(self.config, 'output_dim') else 10,
+                    'complexity': 'O(1)'
+                }
+            }
         }
 
 
