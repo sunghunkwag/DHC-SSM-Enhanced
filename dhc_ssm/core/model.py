@@ -1,1 +1,163 @@
-"""\nDHC-SSM Model v3.1\n\nSimplified architecture with proven components for stable training.\nUses real CIFAR-10 data for validation.\n"""\n\nimport torch\nimport torch.nn as nn\nfrom typing import Dict, Optional, Tuple\nimport logging\n\nlogger = logging.getLogger(__name__)\n\n\nclass SpatialEncoder(nn.Module):\n    """CNN-based spatial feature extraction."""\n    \n    def __init__(self, input_channels=3, hidden_dim=64):\n        super().__init__()\n        self.conv_layers = nn.Sequential(\n            nn.Conv2d(input_channels, hidden_dim, 3, padding=1),\n            nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(hidden_dim, hidden_dim * 2, 3, padding=1),\n            nn.ReLU(),\n            nn.MaxPool2d(2),\n            nn.Conv2d(hidden_dim * 2, hidden_dim * 4, 3, padding=1),\n            nn.ReLU(),\n            nn.AdaptiveAvgPool2d(1)\n        )\n        \n    def forward(self, x):\n        return self.conv_layers(x).squeeze(-1).squeeze(-1)\n\n\nclass TemporalSSM(nn.Module):\n    """Simplified State Space Model for temporal processing."""\n    \n    def __init__(self, hidden_dim=256, state_dim=64):\n        super().__init__()\n        self.hidden_dim = hidden_dim\n        self.state_dim = state_dim\n        \n        self.A = nn.Parameter(torch.randn(state_dim, state_dim) * 0.01)\n        self.B = nn.Parameter(torch.randn(state_dim, hidden_dim) * 0.01)\n        self.C = nn.Parameter(torch.randn(hidden_dim, state_dim) * 0.01)\n        self.D = nn.Parameter(torch.zeros(hidden_dim, hidden_dim))\n        \n    def forward(self, x):\n        batch_size = x.size(0)\n        state = torch.zeros(batch_size, self.state_dim, device=x.device)\n        \n        state = torch.tanh(state @ self.A.t() + x @ self.B.t())\n        output = state @ self.C.t() + x @ self.D.t()\n        \n        return output\n\n\nclass DHCSSMModel(nn.Module):\n    """\n    DHC-SSM v3.1: Simplified three-stage architecture.\n    \n    Architecture:\n    1. Spatial Encoder (CNN) - O(1) per position\n    2. Temporal SSM - O(n) complexity\n    3. Classification Head - O(1)\n    \n    Total complexity: O(n)\n    """\n    \n    def __init__(self, config):\n        super().__init__()\n        self.config = config\n        \n        self.spatial_encoder = SpatialEncoder(\n            input_channels=config.input_channels,\n            hidden_dim=config.hidden_dim\n        )\n        \n        self.temporal_ssm = TemporalSSM(\n            hidden_dim=config.hidden_dim * 4,\n            state_dim=config.state_dim\n        )\n        \n        self.classifier = nn.Sequential(\n            nn.Linear(config.hidden_dim * 4, config.hidden_dim * 2),\n            nn.ReLU(),\n            nn.Dropout(0.3),\n            nn.Linear(config.hidden_dim * 2, config.output_dim)\n        )\n        \n        self._initialize_weights()\n        \n    def _initialize_weights(self):\n        """Proper weight initialization for stable training."""\n        for m in self.modules():\n            if isinstance(m, nn.Conv2d):\n                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')\n            elif isinstance(m, nn.Linear):\n                nn.init.xavier_normal_(m.weight)\n                if m.bias is not None:\n                    nn.init.zeros_(m.bias)\n                    \n    def forward(self, x):\n        spatial_features = self.spatial_encoder(x)\n        temporal_features = self.temporal_ssm(spatial_features)\n        logits = self.classifier(temporal_features)\n        return logits\n    \n    def compute_loss(self, logits, targets):\n        """Standard cross-entropy loss."""\n        return nn.functional.cross_entropy(logits, targets)\n    \n    def train_step(self, batch, optimizer):\n        """Single training step."""\n        x, targets = batch\n        \n        optimizer.zero_grad()\n        logits = self(x)\n        loss = self.compute_loss(logits, targets)\n        loss.backward()\n        \n        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)\n        optimizer.step()\n        \n        preds = logits.argmax(dim=1)\n        accuracy = (preds == targets).float().mean()\n        \n        return {\n            'loss': loss.item(),\n            'accuracy': accuracy.item()\n        }\n    \n    def evaluate_step(self, batch):\n        """Single evaluation step."""\n        x, targets = batch\n        \n        with torch.no_grad():\n            logits = self(x)\n            loss = self.compute_loss(logits, targets)\n            preds = logits.argmax(dim=1)\n            accuracy = (preds == targets).float().mean()\n        \n        return {\n            'loss': loss.item(),\n            'accuracy': accuracy.item()\n        }\n\n\nclass DHCSSMConfig:\n    """Configuration for DHC-SSM v3.1"""\n    def __init__(\n        self,\n        input_channels: int = 3,\n        hidden_dim: int = 64,\n        state_dim: int = 64,\n        output_dim: int = 10\n    ):\n        self.input_channels = input_channels\n        self.hidden_dim = hidden_dim\n        self.state_dim = state_dim\n        self.output_dim = output_dim
+"""
+DHC-SSM Model v3.1
+
+Simplified architecture with proven components for stable training.
+Uses real CIFAR-10 data for validation.
+"""
+
+import torch
+import torch.nn as nn
+from typing import Dict, Optional, Tuple
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class SpatialEncoder(nn.Module):
+    """CNN-based spatial feature extraction."""
+    
+    def __init__(self, input_channels=3, hidden_dim=64):
+        super().__init__()
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(input_channels, hidden_dim, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(hidden_dim, hidden_dim * 2, 3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(hidden_dim * 2, hidden_dim * 4, 3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d(1)
+        )
+    
+    def forward(self, x):
+        return self.conv_layers(x).squeeze(-1).squeeze(-1)
+
+
+class TemporalSSM(nn.Module):
+    """Simplified State Space Model for temporal processing."""
+    
+    def __init__(self, hidden_dim=256, state_dim=64):
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.state_dim = state_dim
+        
+        self.A = nn.Parameter(torch.randn(state_dim, state_dim) * 0.01)
+        self.B = nn.Parameter(torch.randn(state_dim, hidden_dim) * 0.01)
+        self.C = nn.Parameter(torch.randn(hidden_dim, state_dim) * 0.01)
+        self.D = nn.Parameter(torch.zeros(hidden_dim, hidden_dim))
+    
+    def forward(self, x):
+        batch_size = x.size(0)
+        state = torch.zeros(batch_size, self.state_dim, device=x.device)
+        
+        state = torch.tanh(state @ self.A.t() + x @ self.B.t())
+        output = state @ self.C.t() + x @ self.D.t()
+        
+        return output
+
+
+class DHCSSMModel(nn.Module):
+    """
+    DHC-SSM v3.1: Simplified three-stage architecture.
+    
+    Architecture:
+    1. Spatial Encoder (CNN) - O(1) per position
+    2. Temporal SSM - O(n) complexity
+    3. Classification Head - O(1)
+    
+    Total complexity: O(n)
+    """
+    
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        
+        self.spatial_encoder = SpatialEncoder(
+            input_channels=config.input_channels,
+            hidden_dim=config.hidden_dim
+        )
+        
+        self.temporal_ssm = TemporalSSM(
+            hidden_dim=config.hidden_dim * 4,
+            state_dim=config.state_dim
+        )
+        
+        self.classifier = nn.Sequential(
+            nn.Linear(config.hidden_dim * 4, config.hidden_dim * 2),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(config.hidden_dim * 2, config.output_dim)
+        )
+        
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        """Proper weight initialization for stable training."""
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.Linear):
+                nn.init.xavier_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+    
+    def forward(self, x):
+        spatial_features = self.spatial_encoder(x)
+        temporal_features = self.temporal_ssm(spatial_features)
+        logits = self.classifier(temporal_features)
+        return logits
+    
+    def compute_loss(self, logits, targets):
+        """Standard cross-entropy loss."""
+        return nn.functional.cross_entropy(logits, targets)
+    
+    def train_step(self, batch, optimizer):
+        """Single training step."""
+        x, targets = batch
+        
+        optimizer.zero_grad()
+        logits = self(x)
+        loss = self.compute_loss(logits, targets)
+        loss.backward()
+        
+        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
+        optimizer.step()
+        
+        preds = logits.argmax(dim=1)
+        accuracy = (preds == targets).float().mean()
+        
+        return {
+            'loss': loss.item(),
+            'accuracy': accuracy.item()
+        }
+    
+    def evaluate_step(self, batch):
+        """Single evaluation step."""
+        x, targets = batch
+        
+        with torch.no_grad():
+            logits = self(x)
+            loss = self.compute_loss(logits, targets)
+            preds = logits.argmax(dim=1)
+            accuracy = (preds == targets).float().mean()
+        
+        return {
+            'loss': loss.item(),
+            'accuracy': accuracy.item()
+        }
+
+
+class DHCSSMConfig:
+    """Configuration for DHC-SSM v3.1"""
+    def __init__(
+        self,
+        input_channels: int = 3,
+        hidden_dim: int = 64,
+        state_dim: int = 64,
+        output_dim: int = 10
+    ):
+        self.input_channels = input_channels
+        self.hidden_dim = hidden_dim
+        self.state_dim = state_dim
+        self.output_dim = output_dim
