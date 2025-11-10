@@ -14,24 +14,55 @@ logger = logging.getLogger(__name__)
 
 
 class SpatialEncoder(nn.Module):
-    """CNN-based spatial feature extraction."""
+    """CNN-based spatial feature extraction with adaptive pooling for small inputs."""
     
     def __init__(self, input_channels=3, hidden_dim=64):
         super().__init__()
-        self.conv_layers = nn.Sequential(
-            nn.Conv2d(input_channels, hidden_dim, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(hidden_dim, hidden_dim * 2, 3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(hidden_dim * 2, hidden_dim * 4, 3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d(1)
-        )
+        self.hidden_dim = hidden_dim
+        
+        # First conv layer (always applied)
+        self.conv1 = nn.Conv2d(input_channels, hidden_dim, 3, padding=1)
+        self.relu1 = nn.ReLU()
+        
+        # Second conv layer (always applied)
+        self.conv2 = nn.Conv2d(hidden_dim, hidden_dim * 2, 3, padding=1)
+        self.relu2 = nn.ReLU()
+        
+        # Third conv layer (always applied)
+        self.conv3 = nn.Conv2d(hidden_dim * 2, hidden_dim * 4, 3, padding=1)
+        self.relu3 = nn.ReLU()
+        
+        # Adaptive pooling (works for any input size)
+        self.adaptive_pool = nn.AdaptiveAvgPool2d(1)
     
     def forward(self, x):
-        return self.conv_layers(x).squeeze(-1).squeeze(-1)
+        # Get input dimensions
+        _, _, h, w = x.shape
+        
+        # First conv block
+        x = self.conv1(x)
+        x = self.relu1(x)
+        # Only pool if dimensions are large enough (>= 4)
+        if h >= 4 and w >= 4:
+            x = nn.functional.max_pool2d(x, 2)
+            h, w = h // 2, w // 2
+        
+        # Second conv block
+        x = self.conv2(x)
+        x = self.relu2(x)
+        # Only pool if dimensions are large enough (>= 4)
+        if h >= 4 and w >= 4:
+            x = nn.functional.max_pool2d(x, 2)
+            h, w = h // 2, w // 2
+        
+        # Third conv block
+        x = self.conv3(x)
+        x = self.relu3(x)
+        
+        # Always use adaptive pooling to get fixed output size
+        x = self.adaptive_pool(x)
+        
+        return x.squeeze(-1).squeeze(-1)
 
 
 class TemporalSSM(nn.Module):
