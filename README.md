@@ -57,11 +57,12 @@ DHC-SSM v3.1 is a state space model architecture designed for spatial-temporal d
 
 ### When to Use DHC-SSM
 
-**Good fit:**
+### Ideal Use Cases
 - Image or spatial observations (Atari, visual control)
 - Variable input dimensions
 - Research on state space models
 - When O(n) scaling matters for large inputs
+
 
 **Not optimal:**
 - Standard MuJoCo tasks with vector observations (use MLP)
