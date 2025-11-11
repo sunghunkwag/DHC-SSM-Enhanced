@@ -1,0 +1,77 @@
+======================================================================
+DHC-SSM v3.1 - COMPREHENSIVE MUJOCO VALIDATION
+======================================================================
+
+This test suite provides rigorous validation:
+1. PPO training with 100-episode learning curves
+2. Direct comparison with MLP baseline
+3. Complexity scaling verification
+
+Note: This will take several minutes to complete.
+
+
+=== Test 1: PPO Learning Curves (DHC-SSM vs MLP) ===
+
+  Training DHC-SSM with PPO...
+  Training Pendulum-v1 for 100 episodes...
+    Episode  10: avg_reward=-1263.36, policy_loss=-0.0005, value_loss=10515.6016
+    Episode  20: avg_reward=-1385.96, policy_loss=-0.0172, value_loss=12446.9473
+    Episode  30: avg_reward=-1242.34, policy_loss=-0.0009, value_loss=10313.0400
+    Episode  40: avg_reward=-1329.17, policy_loss=-0.0001, value_loss=11811.2832
+    Episode  50: avg_reward=-1203.95, policy_loss=-0.0072, value_loss=9443.5654
+    Episode  60: avg_reward=-1119.50, policy_loss=-0.0167, value_loss=8282.1729
+    Episode  70: avg_reward=-1458.80, policy_loss=0.0000, value_loss=13891.1133
+    Episode  80: avg_reward=-1133.09, policy_loss=-0.0000, value_loss=8727.9170
+    Episode  90: avg_reward=-1310.38, policy_loss=0.0000, value_loss=10869.8711
+    Episode 100: avg_reward=-1185.28, policy_loss=-0.0000, value_loss=10266.5469
+
+  Training MLP with PPO...
+  Training Pendulum-v1 for 100 episodes...
+    Episode  10: avg_reward=-1631.12, policy_loss=-0.0000, value_loss=16796.4160
+    Episode  20: avg_reward=-1658.46, policy_loss=-0.0024, value_loss=17258.8047
+    Episode  30: avg_reward=-1616.51, policy_loss=-0.0007, value_loss=16382.8545
+    Episode  40: avg_reward=-1539.61, policy_loss=-0.0012, value_loss=15056.3623
+    Episode  50: avg_reward=-1602.70, policy_loss=-0.0007, value_loss=15963.0801
+    Episode  60: avg_reward=-1569.02, policy_loss=-0.0002, value_loss=15282.2695
+    Episode  70: avg_reward=-1598.08, policy_loss=-0.0000, value_loss=15779.2422
+    Episode  80: avg_reward=-1582.90, policy_loss=-0.0000, value_loss=15250.6338
+    Episode  90: avg_reward=-1515.32, policy_loss=-0.0000, value_loss=14332.3984
+    Episode 100: avg_reward=-1460.96, policy_loss=-0.0000, value_loss=13211.9531
+
+  DHC-SSM: Initial=-1263.36, Final=-1185.28, Improvement=78.07
+  MLP:     Initial=-1631.12, Final=-1460.96, Improvement=170.16
+
+=== Test 2: Inference Speed vs Observation Dimension ===
+
+   Obs Dim | DHC-SSM (ms) |   MLP (ms) |  Speedup |  DHC Params |  MLP Params
+  ---------+--------------+------------+----------+-------------+------------
+         3 |        0.497 |      0.051 |     0.10x |     508,352 |       4,806
+        11 |        0.491 |      0.054 |     0.11x |     509,376 |       5,318
+        17 |        0.507 |      0.054 |     0.11x |     511,305 |       5,702
+        33 |        0.603 |      0.057 |     0.09x |     514,772 |       6,726
+        65 |        0.579 |      0.054 |     0.09x |     524,673 |       8,774
+
+=== Test 3: Complexity Scaling Analysis ===
+
+  Testing complexity scaling...
+
+   Obs Dim |  DHC Ratio |  MLP Ratio |   Linear (O(n))
+  ---------+------------+------------+----------------
+         8 |       1.00 |       1.00 |            1.00
+        16 |       1.00 |       0.98 |            2.00
+        32 |       1.10 |       0.99 |            4.00
+        64 |       1.10 |       1.01 |            8.00
+       128 |       1.26 |       0.99 |           16.00
+
+  ✓ DHC-SSM scales approximately O(n)
+
+======================================================================
+VALIDATION RESULTS
+======================================================================
+PPO Learning Curves (DHC-SSM vs MLP): ✓ PASS
+Inference Speed vs Observation Dimension: ✓ PASS
+Complexity Scaling Analysis: ✓ PASS
+
+Total: 3/3 tests passed
+
+Results saved to: tests/mujoco_validation_results.json

@@ -1,0 +1,128 @@
+{
+  "Inference Speed Comparison": {
+    "passed": true,
+    "data": {
+      "Pendulum-v1": {
+        "obs_dim": 3,
+        "action_dim": 1,
+        "dhc_ssm": {
+          "params": 507667,
+          "time_ms": 0.8438084125518799,
+          "fps": 1185.103140860802
+        },
+        "mlp": {
+          "params": 17153,
+          "time_ms": 0.1056356430053711,
+          "fps": 9466.501755938141
+        },
+        "cnn": {
+          "params": 769,
+          "time_ms": 0.12047934532165527,
+          "fps": 8300.177904604345
+        },
+        "speedup_vs_mlp": 0.12518913231251566,
+        "speedup_vs_cnn": 0.1427804505495468
+      },
+      "HalfCheetah-v5": {
+        "obs_dim": 17,
+        "action_dim": 6,
+        "dhc_ssm": {
+          "params": 511305,
+          "time_ms": 0.5466244220733643,
+          "fps": 1829.4096634156365
+        },
+        "mlp": {
+          "params": 19590,
+          "time_ms": 0.06199383735656739,
+          "fps": 16130.635602509026
+        },
+        "cnn": {
+          "params": 1480,
+          "time_ms": 0.11755609512329102,
+          "fps": 8506.57721278693
+        },
+        "speedup_vs_mlp": 0.11341212513232164,
+        "speedup_vs_cnn": 0.21505825641195633
+      }
+    }
+  },
+  "Parameter Efficiency": {
+    "passed": true,
+    "data": [
+      {
+        "name": "DHC-SSM (hidden=32)",
+        "params": 143753,
+        "time_ms": 0.4208717346191406,
+        "fps": 2376.020810485004
+      },
+      {
+        "name": "DHC-SSM (hidden=64)",
+        "params": 511305,
+        "time_ms": 0.5379929542541504,
+        "fps": 1858.7604021438456
+      },
+      {
+        "name": "MLP (hidden=64)",
+        "params": 5702,
+        "time_ms": 0.05574750900268555,
+        "fps": 17938.021229824397
+      },
+      {
+        "name": "MLP (hidden=128)",
+        "params": 19590,
+        "time_ms": 0.06104803085327148,
+        "fps": 16380.54472884626
+      },
+      {
+        "name": "MLP (hidden=256)",
+        "params": 71942,
+        "time_ms": 0.06647682189941406,
+        "fps": 15042.837058502853
+      }
+    ]
+  },
+  "Batch Processing Efficiency": {
+    "passed": true,
+    "data": {
+      "batch_1": {
+        "dhc_throughput": 1816.919431484923,
+        "mlp_throughput": 15398.439708500835,
+        "dhc_time_ms": 0.550382137298584,
+        "mlp_time_ms": 0.0649416446685791
+      },
+      "batch_4": {
+        "dhc_throughput": 4010.962886459917,
+        "mlp_throughput": 57805.626475097764,
+        "dhc_time_ms": 0.9972667694091797,
+        "mlp_time_ms": 0.06919741630554199
+      },
+      "batch_16": {
+        "dhc_throughput": 12405.513161786454,
+        "mlp_throughput": 191712.22396800457,
+        "dhc_time_ms": 1.2897491455078125,
+        "mlp_time_ms": 0.08345842361450195
+      },
+      "batch_32": {
+        "dhc_throughput": 20547.990596938263,
+        "mlp_throughput": 375675.8977803902,
+        "dhc_time_ms": 1.5573298931121826,
+        "mlp_time_ms": 0.08517980575561523
+      },
+      "batch_64": {
+        "dhc_throughput": 30248.532114537098,
+        "mlp_throughput": 646497.4916609467,
+        "dhc_time_ms": 2.115805149078369,
+        "mlp_time_ms": 0.09899497032165527
+      }
+    }
+  },
+  "Memory Usage Comparison": {
+    "passed": true,
+    "data": {
+      "dhc_params": 511305,
+      "mlp_params": 19590,
+      "dhc_size_mb": 1.9504737854003906,
+      "mlp_size_mb": 0.07472991943359375
+    }
+  }
+}
