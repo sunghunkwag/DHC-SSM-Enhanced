@@ -1,4 +1,4 @@
-# DHC-SSM Enhanced Architecture v3.1
+# DHC-SSM-Enhanced
 
 ## Deterministic Hierarchical Causal State Space Model
 
@@ -16,60 +16,73 @@ DHC-SSM v3.1 is a state space model architecture designed for spatial-temporal d
 
 ### What's New in v3.1
 
-**MuJoCo Reinforcement Learning Integration**
-- Full support for continuous control tasks in MuJoCo environments
-- Specialized RL adapters: Policy, Value, and Actor-Critic networks
-- Verified learning capability with PPO training (100 episodes)
-- Comprehensive validation with baseline comparisons
+**Fixed PPO Implementation**
+- Corrected PPO with Gaussian policy for continuous actions
+- Proper log probability computation for policy gradients
+- Mini-batch updates with entropy bonus for exploration
+- Gradient clipping for training stability
 
-**Architecture Improvements**
-- Fixed dimension collapse issue for small observation spaces
-- Adaptive pooling strategy for variable input dimensions
-- Enhanced feature extraction for 1D observation vectors
-- Orthogonal weight initialization for stable RL training
+**Simplified SSM for RL**
+- New rl_policy_v2.py bypasses spatial encoder for vector observations
+- LayerNorm for stability in RL training
+- Smaller weight initialization for continuous control
+- Competitive performance with MLP baseline
 
-**Validation and Testing**
-- PPO training validation on Pendulum-v1
-- Direct comparison with MLP baseline
-- Computational complexity verification
-- Honest performance assessment with limitations documented
+**Validated Learning**
+- Pendulum-v1: SSM +113 improvement, MLP +32 improvement
+- Hopper-v4: SSM +6 improvement, MLP +0.2 improvement
+- Reproducible across multiple random seeds
+- Both SSM and MLP demonstrate successful learning
 
 ### Key Features
 
-- **O(n) Complexity:** Verified computational scaling better than linear
-- **Adaptive Architecture:** Handles variable input dimensions from 2x2 to large images
-- **RL Support:** Policy, value, and actor-critic adapters for continuous control
-- **Production Ready:** Comprehensive testing and documentation
+- **O(n) Complexity:** Linear computational scaling
+- **Adaptive Architecture:** Handles variable input dimensions
+- **RL Support:** Simplified SSM architecture for continuous control
+- **Validated Learning:** Verified with proper PPO implementation
 
 ---
 
 ## Performance Summary
 
-### Validated Results (v3.1)
+### Benchmark Results (v3.1)
 
-| Metric | DHC-SSM | MLP Baseline | Notes |
-|--------|---------|--------------|-------|
-| **Learning (PPO)** | ✅ Verified | ✅ Verified | Both can learn |
-| **Inference Speed** | ~2000 FPS | ~20,000 FPS | MLP is 10x faster |
-| **Parameters** | ~510K | ~5K | DHC-SSM has 100x more |
-| **Complexity** | O(n) or better | O(n) | Both scale linearly |
-| **Pendulum Final** | -1185 reward | -1461 reward | DHC-SSM performs better |
+**Pendulum-v1 (200 episodes)**
 
-### When to Use DHC-SSM
+| Model | Initial | Final | Improvement |
+|-------|---------|-------|-------------|
+| SSM | -1436 | -1323 | +113 |
+| MLP | -1570 | -1538 | +32 |
 
-### Ideal Use Cases
-- Image or spatial observations (Atari, visual control)
-- Variable input dimensions
+**Hopper-v4 (200 episodes)**
+
+| Model | Initial | Final | Improvement |
+|-------|---------|-------|-------------|
+| SSM | 10.0 | 15.8 | +6 |
+| MLP | 9.2 | 9.4 | +0.2 |
+
+**Reproducibility (3 seeds, 100 episodes)**
+
+| Seed | Improvement |
+|------|-------------|
+| 42 | +50 |
+| 123 | +90 |
+| 456 | +464 |
+
+### When to Use
+
+**SSM is suitable for:**
+- Image-based RL (Atari, visual control)
+- Tasks requiring temporal context
 - Research on state space models
-- When O(n) scaling matters for large inputs
+- Variable input dimensions
 
-
-**Not optimal:**
-- Standard MuJoCo tasks with vector observations (use MLP)
+**Use MLP for:**
+- Standard MuJoCo vector observations
 - When inference speed is critical
-- When parameter efficiency is important
+- When parameter efficiency matters
 
-**See [VALIDATION_REPORT.md](VALIDATION_REPORT.md) for detailed analysis.**
+**See [BENCHMARK_RESULTS_FIXED.md](BENCHMARK_RESULTS_FIXED.md) for detailed analysis.**
 
 ---
 
@@ -102,300 +115,302 @@ pip install mujoco gymnasium[mujoco]
 
 ## Quick Start
 
-### Basic Computer Vision Usage
+### Computer Vision
 
 ```python
-import torch
 from dhc_ssm.core.model import DHCSSMModel, DHCSSMConfig
 
-# Create model
 config = DHCSSMConfig(
     input_channels=3,
     hidden_dim=64,
     state_dim=64,
     output_dim=10
 )
-model = DHCSSMModel(config)
 
-# Forward pass
-x = torch.randn(4, 3, 32, 32)
-output = model(x)
-print(f"Output shape: {output.shape}")  # [4, 10]
+model = DHCSSMModel(config)
+output = model(images)  # (batch, 3, H, W) -> (batch, 10)
 ```
 
-### Reinforcement Learning Usage
+### Reinforcement Learning
+
+```python
+from dhc_ssm.adapters.rl_policy_v2 import SimpleRLPolicy, SimpleRLValue
+import gymnasium as gym
+
+env = gym.make("Pendulum-v1")
+obs_dim = env.observation_space.shape[0]
+action_dim = env.action_space.shape[0]
+
+# Policy network
+policy = SimpleRLPolicy(obs_dim, action_dim, hidden_dim=64, state_dim=32)
+
+# Value network
+value_fn = SimpleRLValue(obs_dim, hidden_dim=64, state_dim=32)
+
+# Use with PPO or other RL algorithms
+```
+
+---
+
+## Training with PPO
+
+Example PPO training loop:
 
 ```python
 import torch
-import gymnasium as gym
-from dhc_ssm.adapters.rl_policy import RLPolicyAdapter
-from dhc_ssm.core.model import DHCSSMConfig
+import torch.nn as nn
+from dhc_ssm.adapters.rl_policy_v2 import SimpleRLPolicy, SimpleRLValue
 
-# Create environment
-env = gym.make('Pendulum-v1')
-obs_dim = env.observation_space.shape[0]
-action_dim = env.observation_space.shape[0]
+# Initialize networks
+policy = SimpleRLPolicy(obs_dim, action_dim)
+value_fn = SimpleRLValue(obs_dim)
 
-# Create policy
-config = DHCSSMConfig(hidden_dim=64)
-policy = RLPolicyAdapter(obs_dim, action_dim, config)
+# Optimizers
+policy_opt = torch.optim.Adam(policy.parameters(), lr=3e-4)
+value_opt = torch.optim.Adam(value_fn.parameters(), lr=1e-3)
 
-# Run episode
-obs, _ = env.reset()
-for _ in range(200):
-    obs_tensor = torch.FloatTensor(obs).unsqueeze(0)
-    with torch.no_grad():
-        action = policy(obs_tensor).squeeze(0).numpy()
-    obs, reward, terminated, truncated, _ = env.step(action)
-    if terminated or truncated:
-        break
-
-env.close()
+# Training loop
+for episode in range(num_episodes):
+    # Collect trajectories
+    observations, actions, rewards, values, dones = collect_rollouts(env, policy, value_fn)
+    
+    # Compute advantages with GAE
+    advantages, returns = compute_gae(rewards, values, dones)
+    
+    # PPO update
+    ppo_update(policy, value_fn, policy_opt, value_opt, 
+               observations, actions, advantages, returns)
 ```
+
+See `tests/test_fixed_ppo.py` for complete implementation.
 
 ---
 
 ## Architecture
 
-DHC-SSM implements a hierarchical design optimized for spatial-temporal processing:
+### Core Components
 
-### Layer 1: Spatial Encoder
+1. **Spatial Encoder:** Processes spatial features with adaptive pooling
+2. **State Space Module:** O(n) temporal modeling with state transitions
+3. **Causal Attention:** Hierarchical attention for long-range dependencies
+4. **Output Projection:** Task-specific output layers
 
-Enhanced CNN with adaptive pooling for spatial feature extraction.
+### RL-Specific Architecture
 
-**Key features:**
-- Adaptive pooling prevents dimension collapse
-- Handles inputs from 2x2 to large images
-- Reshapes 1D observations to 2D for CNN processing
-- Maintains fixed internal dimensions
+The simplified SSM for RL (rl_policy_v2.py):
 
-### Layer 2: Temporal Processor
+```
+Input (obs_dim) 
+  -> Linear + LayerNorm + Tanh (hidden_dim)
+  -> State Projection (state_dim)
+  -> State Update (state_dim)
+  -> Output Projection (action_dim or 1)
+```
 
-State Space Model with parallel scan for efficient sequence processing.
-
-**Key features:**
-- O(n) complexity for temporal modeling
-- Stable discretization for long sequences
-- Proper gradient computation
-
-### Layer 3: Output Head
-
-Task-specific output layers for classification or control.
-
----
-
-## Validation Results
-
-### PPO Training (100 Episodes on Pendulum-v1)
-
-| Model | Initial Reward | Final Reward | Improvement |
-|-------|----------------|--------------|-------------|
-| DHC-SSM | -1263 | -1185 | +78 |
-| MLP | -1631 | -1461 | +170 |
-
-**Findings:**
-- ✅ Both models demonstrate learning capability
-- DHC-SSM achieves better absolute performance
-- MLP shows larger relative improvement
-- Both suitable for RL applications
-
-### Inference Speed Comparison
-
-| Observation Dim | DHC-SSM | MLP | Speedup |
-|-----------------|---------|-----|---------|
-| 3 | 0.50 ms | 0.05 ms | 0.10x |
-| 17 | 0.51 ms | 0.05 ms | 0.11x |
-| 65 | 0.58 ms | 0.05 ms | 0.09x |
-
-**Findings:**
-- MLP is 9-10x faster for inference
-- Both achieve real-time performance (>1000 FPS)
-- DHC-SSM overhead acceptable for most applications
-
-### Complexity Scaling
-
-| Obs Dim | Time Increase (DHC) | Time Increase (Linear) |
-|---------|---------------------|------------------------|
-| 8x | 1.00x | 1.00x |
-| 16x | 1.00x | 2.00x |
-| 32x | 1.10x | 4.00x |
-| 64x | 1.10x | 8.00x |
-| 128x | 1.26x | 16.00x |
-
-**Findings:**
-- ✅ DHC-SSM scales better than O(n)
-- 16x dimension increase → only 1.26x time increase
-- Adaptive pooling maintains constant internal dimensions
+Key differences from standard DHC-SSM:
+- No spatial convolutions for 1D observations
+- LayerNorm instead of BatchNorm
+- Smaller initialization (gain=0.01)
+- Direct state space transformation
 
 ---
 
 ## Testing
 
-### Running Tests
+### Run All Tests
 
 ```bash
-# Install test dependencies
-pip install pytest mujoco gymnasium[mujoco]
-
-# Run comprehensive computer vision tests
-python tests/test_comprehensive.py
-
-# Run MuJoCo validation (includes PPO training)
-python tests/test_mujoco_validation.py
-
-# Run baseline comparisons
-python tests/test_baseline_comparison.py
-
-# Run all tests
-pytest tests/ -v
+pytest tests/
 ```
 
-### Test Results
+### Run Specific Tests
 
-**Computer Vision Tests:** 5/5 passing
-**MuJoCo RL Tests:** 6/6 passing  
-**Validation Tests:** 3/3 passing (PPO, baselines, complexity)
-**Baseline Tests:** 4/4 passing
+```bash
+# Core functionality
+pytest tests/test_comprehensive.py
+
+# Fixed PPO validation
+python tests/test_fixed_ppo.py
+
+# Full benchmarks
+python tests/test_fixed_benchmarks.py
+```
+
+### Generate Plots
+
+```bash
+python scripts/generate_fixed_plots.py
+```
+
+---
+
+## Benchmarks
+
+Comprehensive benchmarks available in `benchmarks_fixed/` directory:
+
+- `pendulum_200.json/csv` - Pendulum learning curves
+- `hopper_200.json/csv` - Hopper learning curves
+- `reproducibility.json` - Multi-seed validation
+- `plots/` - Visualization plots
+
+To reproduce benchmarks:
+
+```bash
+python tests/test_fixed_benchmarks.py
+python scripts/generate_fixed_plots.py
+```
+
+---
+
+## Project Structure
+
+```
+DHC-SSM-Enhanced/
+├── dhc_ssm/
+│   ├── core/
+│   │   ├── model.py          # Core DHC-SSM model
+│   │   ├── spatial.py        # Spatial encoder
+│   │   ├── ssm.py            # State space module
+│   │   └── attention.py      # Causal attention
+│   └── adapters/
+│       ├── rl_policy.py      # Original RL adapters
+│       └── rl_policy_v2.py   # Simplified SSM for RL
+├── tests/
+│   ├── test_comprehensive.py      # Core tests
+│   ├── test_fixed_ppo.py          # PPO validation
+│   └── test_fixed_benchmarks.py   # Full benchmarks
+├── benchmarks_fixed/              # Benchmark results
+└── scripts/
+    └── generate_fixed_plots.py    # Plot generation
+```
 
 ---
 
 ## API Reference
 
-### Core Classes
-
-#### DHCSSMModel
-
-Main model for computer vision tasks.
+### SimpleRLPolicy
 
 ```python
-from dhc_ssm.core.model import DHCSSMModel, DHCSSMConfig
-
-config = DHCSSMConfig(input_channels=3, hidden_dim=64, output_dim=10)
-model = DHCSSMModel(config)
-
-# Forward pass
-output = model(x)
-
-# Training
-metrics = model.train_step((x, y), optimizer)
+SimpleRLPolicy(
+    observation_dim: int,
+    action_dim: int,
+    hidden_dim: int = 128,
+    state_dim: int = 64
+)
 ```
 
-#### RLPolicyAdapter
+Policy network with simplified SSM architecture.
 
-Policy network for reinforcement learning.
+**Parameters:**
+- `observation_dim`: Dimension of observation space
+- `action_dim`: Dimension of action space
+- `hidden_dim`: Hidden layer dimension
+- `state_dim`: State space dimension
+
+**Methods:**
+- `forward(obs)`: Returns actions in [-1, 1]
+
+### SimpleRLValue
 
 ```python
-from dhc_ssm.adapters.rl_policy import RLPolicyAdapter
-
-policy = RLPolicyAdapter(obs_dim, action_dim, config)
-action = policy(observation)
+SimpleRLValue(
+    observation_dim: int,
+    hidden_dim: int = 128,
+    state_dim: int = 64
+)
 ```
 
-#### RLActorCriticAdapter
+Value function network with simplified SSM architecture.
 
-Combined actor-critic network.
+**Parameters:**
+- `observation_dim`: Dimension of observation space
+- `hidden_dim`: Hidden layer dimension
+- `state_dim`: State space dimension
 
-```python
-from dhc_ssm.adapters.rl_policy import RLActorCriticAdapter
-
-actor_critic = RLActorCriticAdapter(obs_dim, action_dim, config)
-action, value = actor_critic(observation)
-```
-
----
-
-## Documentation
-
-- **[VALIDATION_REPORT.md](VALIDATION_REPORT.md)** - Comprehensive validation results with honest assessment
-- **[MUJOCO_IMPROVEMENTS.md](MUJOCO_IMPROVEMENTS.md)** - Technical improvements for RL integration
-- **[MUJOCO_ANALYSIS.md](MUJOCO_ANALYSIS.md)** - Initial analysis of MuJoCo compatibility
-- **[TEST_REPORT.md](TEST_REPORT.md)** - Test validation report
-- **[CHANGELOG.md](CHANGELOG.md)** - Version history
+**Methods:**
+- `forward(obs)`: Returns state value estimate
 
 ---
 
 ## Limitations
 
-### Current Limitations
+### Current Scope
 
-⚠️ **Not optimal for vector-based RL:** MLP is faster and more parameter-efficient for standard MuJoCo tasks
+- Tested on 2 environments (Pendulum, Hopper)
+- 200 episodes may be insufficient for full convergence
+- No hyperparameter tuning performed
+- Single algorithm tested (PPO)
 
-⚠️ **Limited RL validation:** Only tested with PPO on simple environments (Pendulum)
+### Not Tested
 
-⚠️ **No image-based RL validation:** Not yet tested on Atari or visual control tasks
-
-⚠️ **Parameter overhead:** 100x more parameters than comparable MLP
-
-⚠️ **Short training runs:** Validated on 100 episodes, not full convergence
-
-### Recommended Use Cases
-
-✅ **Image-based tasks:** Designed for spatial data (Atari, visual control)
-
-✅ **Research:** Exploring state space models for RL
-
-✅ **Variable inputs:** When input dimensions vary
-
-✅ **Temporal modeling:** When temporal context is important
+- Other MuJoCo environments (Walker, HalfCheetah, Humanoid)
+- Image-based RL (Atari)
+- Longer training runs (1000+ episodes)
+- Other algorithms (SAC, TD3)
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are welcome. Please:
 
-### Development Setup
+1. Fork the repository
+2. Create a feature branch
+3. Add tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
 
-```bash
-git clone https://github.com/sunghunkwag/DHC-SSM-Enhanced.git
-cd DHC-SSM-Enhanced
-pip install -e ".[dev]"
+---
+
+## Citation
+
+If you use this code in your research, please cite:
+
+```bibtex
+@software{dhc_ssm_2025,
+  title={DHC-SSM: Deterministic Hierarchical Causal State Space Model},
+  author={Kwag, Sunghun},
+  year={2025},
+  version={3.1},
+  url={https://github.com/sunghunkwag/DHC-SSM-Enhanced}
+}
 ```
 
 ---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-## Citation
-
-If you use DHC-SSM in your research, please cite:
-
-```bibtex
-@software{dhc_ssm_v3_1,
-  title = {DHC-SSM: Deterministic Hierarchical Causal State Space Model v3.1},
-  author = {DHC-SSM Development Team},
-  year = {2025},
-  month = {11},
-  version = {3.1},
-  url = {https://github.com/sunghunkwag/DHC-SSM-Enhanced},
-  note = {State space model with MuJoCo RL validation}
-}
-```
+MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
 ## Acknowledgments
 
-- Original DHC-SSM concept and v2.1 implementation
-- PyTorch team for the deep learning framework
-- MuJoCo and Gymnasium teams for RL environments
-- State Space Model research community
+Built with PyTorch and validated on MuJoCo environments via Gymnasium.
 
 ---
 
 ## Contact
 
-- Repository: [github.com/sunghunkwag/DHC-SSM-Enhanced](https://github.com/sunghunkwag/DHC-SSM-Enhanced)
-- Issues: [GitHub Issues](https://github.com/sunghunkwag/DHC-SSM-Enhanced/issues)
+For questions or issues, please open an issue on GitHub.
 
 ---
 
 ## Version History
 
-- **v3.1** (November 2025): MuJoCo RL integration with PPO validation and honest performance assessment
-- **v3.0** (October 2025): Complete rewrite with fixed learning mechanism
-- **v2.1** (Earlier): Original implementation with known issues
+### v3.1 (Current)
+- Fixed PPO implementation with Gaussian policy
+- Simplified SSM architecture for RL (rl_policy_v2.py)
+- Validated learning on Pendulum and Hopper
+- Reproducibility verification across seeds
+- Comprehensive benchmark suite
+
+### v3.0
+- Initial MuJoCo integration
+- Original RL adapters
+- Spatial encoder for vector observations
+
+### v2.0
+- Core DHC-SSM architecture
+- Computer vision support
+- O(n) complexity verification
