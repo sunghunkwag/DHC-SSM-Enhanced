@@ -1,0 +1,51 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "v1.0.0",
+  "entity": {
+    "type": "individual",
+    "role": "owner",
+    "name": "Sung hun kwag",
+    "email": "sunghunkwag@gmail.com",
+    "description": "Independent AI Researcher specializing in conceptual AI architecture design. I design AI architectures through hypothesis-driven research, testing foundational assumptions about scalable intelligence systems using AI-augmented conceptual modeling methodologies. My work focuses on State Space Models (SSM), meta-reinforcement learning, and autonomous self-organizing systems.",
+    "webpageUrl": {
+      "url": "https://github.com/sunghunkwag"
+    }
+  },
+  "projects": [
+    {
+      "guid": "dhc-ssm-enhanced",
+      "name": "DHC-SSM-Enhanced",
+      "description": "DHC-SSM v3.0: Production-ready Deterministic Hierarchical Causal State Space Model with O(n) complexity. A novel state space model architecture that combines deterministic hierarchical structures with causal inference capabilities, achieving linear computational complexity while maintaining expressive power for sequence modeling tasks.",
+      "webpageUrl": {
+        "url": "https://github.com/sunghunkwag/DHC-SSM-Enhanced"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/sunghunkwag/DHC-SSM-Enhanced"
+      },
+      "licenses": ["spdx:MIT"],
+      "tags": ["machine-learning", "state-space-models", "deep-learning", "python", "ai-research"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "bank-transfer",
+        "type": "bank",
+        "address": "",
+        "description": "Will accept direct bank transfers. Please email me for details."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "research-grant",
+        "status": "active",
+        "name": "AI Research Development Grant",
+        "description": "Support for continued research and development of novel AI architectures including DHC-SSM, meta-reinforcement learning frameworks, and autonomous self-organizing systems.",
+        "amount": 25000,
+        "currency": "USD",
+        "frequency": "one-time",
+        "channels": ["bank-transfer"]
+      }
+    ]
+  }
+}
