@@ -325,7 +325,7 @@ Results saved in `benchmarks_fixed/` and `benchmarks_extended/` directories.
 
 MIT License. See [LICENSE](LICENSE) for details.
 
----
+
 
 ## Version History
 
