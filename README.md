@@ -303,15 +303,7 @@ Results saved in `benchmarks_fixed/` and `benchmarks_extended/` directories.
 
 ---
 
-## Contributing
 
-Contributions welcome. Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass
-5. Submit a pull request
 
 ---
 
